@@ -5,6 +5,20 @@ import 'src/side_bar.dart';
 export 'src/menu_item.dart';
 export 'src/side_bar.dart';
 
+class SidebarController extends ChangeNotifier {
+  bool? open;
+
+  void openSidebar() {
+    open = true;
+    notifyListeners();
+  }
+
+  void closeSidebar() {
+    open = false;
+    notifyListeners();
+  }
+}
+
 class AdminScaffold extends StatefulWidget {
   AdminScaffold({
     Key? key,
@@ -12,19 +26,22 @@ class AdminScaffold extends StatefulWidget {
     this.sideBar,
     required this.body,
     this.backgroundColor,
+    this.onSidebarState,
+    this.sidebarController,
   }) : super(key: key);
 
   final AppBar? appBar;
   final SideBar? sideBar;
   final Widget body;
   final Color? backgroundColor;
+  final Function(Map<String, dynamic>)? onSidebarState;
+  final SidebarController? sidebarController;
 
   @override
   _AdminScaffoldState createState() => _AdminScaffoldState();
 }
 
-class _AdminScaffoldState extends State<AdminScaffold>
-    with SingleTickerProviderStateMixin {
+class _AdminScaffoldState extends State<AdminScaffold> with SingleTickerProviderStateMixin {
   static const _mobileThreshold = 768.0;
 
   late AnimationController _animationController;
@@ -36,6 +53,15 @@ class _AdminScaffoldState extends State<AdminScaffold>
   @override
   void initState() {
     super.initState();
+    SidebarController? _sidebarController = widget.sidebarController;
+    if (_sidebarController != null) {
+      _sidebarController.addListener(() {
+        if (_sidebarController.open == true)
+          openSidebar();
+        else
+          closeSidebar();
+      });
+    }
     _animationController = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: 300),
@@ -63,13 +89,36 @@ class _AdminScaffoldState extends State<AdminScaffold>
     super.dispose();
   }
 
+  void updateSidebarState(String state) {
+    if (widget.onSidebarState != null) widget.onSidebarState!({'state': state, 'layout': _isMobile ? 'mobile' : 'web'});
+  }
+
+  void openSidebar() {
+    setState(() {
+      _isOpenSidebar = true;
+      _animationController.forward();
+      updateSidebarState('opened');
+    });
+  }
+
+  void closeSidebar() {
+    setState(() {
+      _isOpenSidebar = false;
+      _animationController.reverse();
+      updateSidebarState('closed');
+    });
+  }
+
   void _toggleSidebar() {
     setState(() {
       _isOpenSidebar = !_isOpenSidebar;
-      if (_isOpenSidebar)
+      if (_isOpenSidebar) {
         _animationController.forward();
-      else
+        updateSidebarState('opened');
+      } else {
         _animationController.reverse();
+        updateSidebarState('closed');
+      }
     });
   }
 
@@ -81,8 +130,7 @@ class _AdminScaffoldState extends State<AdminScaffold>
 
   void _onDragUpdate(DragUpdateDetails details) {
     if (_canDragged) {
-      final delta =
-          (details.primaryDelta ?? 0.0) / (widget.sideBar?.width ?? 1.0);
+      final delta = (details.primaryDelta ?? 0.0) / (widget.sideBar?.width ?? 1.0);
       _animationController.value += delta;
     }
   }
@@ -92,6 +140,7 @@ class _AdminScaffoldState extends State<AdminScaffold>
     if (delta < 0) {
       _isOpenSidebar = false;
       _animationController.reverse();
+      updateSidebarState('closed');
     }
   }
 
@@ -99,18 +148,19 @@ class _AdminScaffoldState extends State<AdminScaffold>
     final minFlingVelocity = 365.0;
 
     if (details.velocity.pixelsPerSecond.dx.abs() >= minFlingVelocity) {
-      final visualVelocity =
-          details.velocity.pixelsPerSecond.dx / (widget.sideBar?.width ?? 1.0);
+      final visualVelocity = details.velocity.pixelsPerSecond.dx / (widget.sideBar?.width ?? 1.0);
 
       await _animationController.fling(velocity: visualVelocity);
       if (_animationController.isCompleted) {
         setState(() {
           _isOpenSidebar = true;
         });
+        updateSidebarState('opened');
       } else {
         setState(() {
           _isOpenSidebar = false;
         });
+        updateSidebarState('closed');
       }
     } else {
       if (_animationController.value < 0.5) {
@@ -118,11 +168,13 @@ class _AdminScaffoldState extends State<AdminScaffold>
         setState(() {
           _isOpenSidebar = false;
         });
+        updateSidebarState('closed');
       } else {
         _animationController.forward();
         setState(() {
           _isOpenSidebar = true;
         });
+        updateSidebarState('opened');
       }
     }
   }
@@ -156,8 +208,7 @@ class _AdminScaffoldState extends State<AdminScaffold>
                       widget.body,
                       if (_animation.value > 0)
                         Container(
-                          color: Colors.black
-                              .withAlpha((150 * _animation.value).toInt()),
+                          color: Colors.black.withAlpha((150 * _animation.value).toInt()),
                         ),
                       if (_animation.value == 1)
                         GestureDetector(
@@ -166,9 +217,7 @@ class _AdminScaffoldState extends State<AdminScaffold>
                         ),
                       ClipRect(
                         child: SizedOverflowBox(
-                          size: Size(
-                              (widget.sideBar?.width ?? 1.0) * _animation.value,
-                              double.infinity),
+                          size: Size((widget.sideBar?.width ?? 1.0) * _animation.value, double.infinity),
                           child: widget.sideBar,
                         ),
                       ),
@@ -179,10 +228,7 @@ class _AdminScaffoldState extends State<AdminScaffold>
                       widget.sideBar != null
                           ? ClipRect(
                               child: SizedOverflowBox(
-                                size: Size(
-                                    (widget.sideBar?.width ?? 1.0) *
-                                        _animation.value,
-                                    double.infinity),
+                                size: Size((widget.sideBar?.width ?? 1.0) * _animation.value, double.infinity),
                                 child: widget.sideBar,
                               ),
                             )
